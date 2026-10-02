@@ -49,3 +49,14 @@ def test_eig_runs_and_is_reasonable():
     res = run_episode(pol, BoundaryEnv(u, learner, budget=30), learner)
     assert 0 <= res["f1"] <= 1 and res["cost"] <= 30
     assert res["n_ask"] + res["n_verify"] == res["cost"]
+
+
+def test_corrupted_universe_keeps_nodes_and_is_acyclic():
+    from rpkt2.graph import corrupt_universe
+    u, learner, noise, rng = _setup()
+    v = corrupt_universe(u, 0.3, 0.3, rng)
+    assert v.n == u.n and v.nodes == u.nodes and v.target_idx == u.target_idx
+    assert all((i < j) for i, j in v.edge_list())  # oriented along gold topological order => acyclic
+    assert len(v.edge_list()) != len(u.edge_list())
+    res = run_episode(EIGPolicy(noise=noise, rng=rng, n_particles=300), BoundaryEnv(v, learner, budget=20), learner)
+    assert 0 <= res["bal_acc"] <= 1

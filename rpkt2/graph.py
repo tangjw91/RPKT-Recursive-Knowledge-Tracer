@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Tuple
 
 import networkx as nx
 import numpy as np
@@ -55,11 +55,56 @@ class Universe:
         for n, d in lengths.items():
             self.depth[self.index[n]] = d
 
+    def _closure(self, i: int, nbrs: List[np.ndarray], cache: Dict[int, np.ndarray]) -> np.ndarray:
+        if i not in cache:
+            seen, stack = set(), list(nbrs[i])
+            while stack:
+                j = stack.pop()
+                if j not in seen:
+                    seen.add(j)
+                    stack.extend(nbrs[j])
+            cache[i] = np.array(sorted(seen), dtype=int)
+        return cache[i]
+
     def ancestors_idx(self, i: int) -> np.ndarray:
-        return np.array([self.index[a] for a in nx.ancestors(self.g, self.nodes[i]) if a in self.index], dtype=int)
+        """Transitive prerequisites of i under this universe's (possibly corrupted) edges."""
+        if not hasattr(self, "_anc_cache"):
+            self._anc_cache, self._desc_cache = {}, {}
+        return self._closure(i, self.prereqs, self._anc_cache)
 
     def descendants_idx(self, i: int) -> np.ndarray:
-        return np.array([self.index[d] for d in nx.descendants(self.g, self.nodes[i]) if d in self.index], dtype=int)
+        if not hasattr(self, "_anc_cache"):
+            self._anc_cache, self._desc_cache = {}, {}
+        return self._closure(i, self.dependents, self._desc_cache)
+
+    def with_edges(self, edges: List[Tuple[int, int]]) -> "Universe":
+        """Copy of this universe over the same nodes/indices with a different edge set (i -> j, i < j)."""
+        v = object.__new__(Universe)
+        v.g, v.target, v.nodes, v.index, v.n, v.target_idx = self.g, self.target, self.nodes, self.index, self.n, self.target_idx
+        pre = [[] for _ in range(self.n)]
+        dep = [[] for _ in range(self.n)]
+        for i, j in edges:
+            pre[j].append(i)
+            dep[i].append(j)
+        v.prereqs = [np.array(sorted(p), dtype=int) for p in pre]
+        v.dependents = [np.array(sorted(d), dtype=int) for d in dep]
+        depth = np.full(self.n, -1, dtype=int)
+        depth[self.target_idx] = 0
+        frontier = [self.target_idx]
+        while frontier:
+            nxt = []
+            for j in frontier:
+                for i in v.prereqs[j]:
+                    if depth[i] < 0:
+                        depth[i] = depth[j] + 1
+                        nxt.append(i)
+            frontier = nxt
+        depth[depth < 0] = depth.max() + 1  # unreachable under the corrupted edges
+        v.depth = depth
+        return v
+
+    def edge_list(self) -> List[Tuple[int, int]]:
+        return [(int(i), j) for j in range(self.n) for i in self.prereqs[j]]
 
 
 def sample_order_ideal(u: Universe, mastery: float, rng: np.random.Generator) -> np.ndarray:
@@ -116,6 +161,24 @@ def load_graph(name: str, rng: np.random.Generator | None = None) -> nx.DiGraph:
         L, W, P = (int(x) for x in name[6:].split(","))
         return synthetic_layered_dag(L, W, P, rng or np.random.default_rng(0))
     raise ValueError(name)
+
+
+def corrupt_universe(u: Universe, drop: float, add: float, rng: np.random.Generator) -> Universe:
+    """Simulate prerequisite-extraction errors over the same concepts.
+
+    Each true edge is dropped with probability `drop` (missed prerequisite); `add` x (number of
+    true edges) spurious edges are inserted between non-adjacent pairs, oriented along the gold
+    topological order so the result stays acyclic. The learner's true state is unaffected.
+    """
+    true_edges = u.edge_list()
+    kept = [e for e in true_edges if rng.random() >= drop]
+    n_add = int(round(add * len(true_edges)))
+    existing = set(true_edges)
+    candidates = [(i, j) for j in range(u.n) for i in range(j) if (i, j) not in existing]
+    if n_add and candidates:
+        pick = rng.choice(len(candidates), size=min(n_add, len(candidates)), replace=False)
+        kept += [candidates[k] for k in pick]
+    return u.with_edges(kept)
 
 
 def candidate_targets(g: nx.DiGraph, min_ancestors: int = 8) -> List[str]:

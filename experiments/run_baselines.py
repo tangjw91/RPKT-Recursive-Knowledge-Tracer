@@ -17,7 +17,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from rpkt2.env import BoundaryEnv  # noqa: E402
-from rpkt2.graph import DOMAINS, Universe, candidate_targets, load_graph  # noqa: E402
+from rpkt2.graph import DOMAINS, Universe, candidate_targets, corrupt_universe, load_graph  # noqa: E402
 from rpkt2.learner import NoiseModel, SimulatedLearner  # noqa: E402
 from rpkt2.policies import REGISTRY  # noqa: E402
 from rpkt2.runner import run_episode  # noqa: E402
@@ -38,6 +38,8 @@ def main() -> None:
     ap.add_argument("--belief-overclaim", type=float, default=None,
                     help="overclaim rate assumed by the belief-based policies (default: the true rate)")
     ap.add_argument("--seeds", nargs="+", type=int, default=None, help="overrides --seed with several seeds")
+    ap.add_argument("--edge-drop", type=float, default=0.0, help="probability each true prerequisite edge is missing from the policy's graph")
+    ap.add_argument("--edge-add", type=float, default=0.0, help="spurious edges added, as a fraction of true edges")
     ap.add_argument("--budget", type=float, default=40.0)
     ap.add_argument("--n-particles", type=int, default=1500)
     ap.add_argument("--seed", type=int, default=0)
@@ -63,16 +65,18 @@ def main() -> None:
                 target = targets[rng.integers(len(targets))]
                 u = Universe(g, target)
                 learner = SimulatedLearner.sample(u, mastery, noise, rng)
+                u_pol = corrupt_universe(u, args.edge_drop, args.edge_add, rng) if (args.edge_drop or args.edge_add) else u
                 for name in args.policies:
                     extra = ({"n_particles": args.n_particles, "verify_cost": args.verify_cost}
                              if name.startswith(("eig", "rl")) else {})
                     policy = REGISTRY[name](noise=belief_noise, rng=np.random.default_rng(rng.integers(1 << 31)), **extra)
-                    env = BoundaryEnv(u, learner, budget=args.budget, verify_cost=args.verify_cost)
+                    env = BoundaryEnv(u_pol, learner, budget=args.budget, verify_cost=args.verify_cost)
                     res = run_episode(policy, env, learner)
                     res.update({"domain": domain, "policy": name, "mastery": mastery, "overclaim": p,
                                 "learner": k, "target": target, "seed": seed, "probe_acc": args.probe_acc,
                                 "verify_cost": args.verify_cost,
-                                "belief_overclaim": belief_noise.p_overclaim})
+                                "belief_overclaim": belief_noise.p_overclaim,
+                                "edge_drop": args.edge_drop, "edge_add": args.edge_add})
                     rows.append(res)
         print(f"{domain} done, {len(rows)} rows, {time.time() - t0:.0f}s", flush=True)
 

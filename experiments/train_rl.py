@@ -16,13 +16,14 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from rpkt2.env import BoundaryEnv  # noqa: E402
-from rpkt2.graph import Universe, candidate_targets, load_graph  # noqa: E402
+from rpkt2.graph import Universe, candidate_targets, corrupt_universe, load_graph  # noqa: E402
 from rpkt2.learner import NoiseModel, SimulatedLearner  # noqa: E402
 from rpkt2.metrics import unknown_set_scores  # noqa: E402
 from rpkt2.policies.rl import GNNPolicyNet, RLPolicy, Transition  # noqa: E402
 
 
-def collect_episode(policy: RLPolicy, env: BoundaryEnv, learner: SimulatedLearner, lam: float):
+def collect_episode(policy: RLPolicy, env: BoundaryEnv, learner: SimulatedLearner, lam: float,
+                    random_termination: float = 0.0, rng: np.random.Generator | None = None):
     obs = env.reset()
     policy.reset(env.u)
     true_unknown = learner.true_unknown
@@ -36,6 +37,8 @@ def collect_episode(policy: RLPolicy, env: BoundaryEnv, learner: SimulatedLearne
         score = unknown_set_scores(policy.estimate(obs), true_unknown)["bal_acc"]
         t = policy.last
         t.reward = (score - prev) - lam * (env.cost_used - cost_before)
+        if not done and random_termination and rng is not None and rng.random() < random_termination:
+            done = True
         t.done = done
         prev = score
         trans.append(t)
@@ -100,6 +103,11 @@ def main() -> None:
     ap.add_argument("--budget-range", nargs=2, type=float, default=[10, 35])
     ap.add_argument("--overclaim-range", nargs=2, type=float, default=[0.0, 0.4])
     ap.add_argument("--masteries", nargs="+", type=float, default=[0.5, 0.7, 0.9])
+    ap.add_argument("--edge-drop-range", nargs=2, type=float, default=[0.0, 0.0])
+    ap.add_argument("--edge-add-range", nargs=2, type=float, default=[0.0, 0.0])
+    ap.add_argument("--init-from", default=None, help="checkpoint to warm-start from (e.g. models/bc_policy.pt)")
+    ap.add_argument("--random-termination", type=float, default=0.0,
+                    help="per-step probability the episode ends early, so accuracy at every budget matters")
     ap.add_argument("--n-particles", type=int, default=800)
     ap.add_argument("--no-belief", action="store_true")
     ap.add_argument("--lr", type=float, default=3e-4)
@@ -129,6 +137,9 @@ def main() -> None:
     print(f"training pool: {len(pool)} (graph, target) pairs", flush=True)
 
     net = GNNPolicyNet()
+    if args.init_from:
+        net.load_state_dict(torch.load(args.init_from, map_location="cpu", weights_only=False)["state_dict"])
+        print("warm start from", args.init_from, flush=True)
     opt = torch.optim.Adam(net.parameters(), lr=args.lr)
     t0 = time.time()
     for upd in range(args.updates):
@@ -140,10 +151,12 @@ def main() -> None:
             noise = NoiseModel(p_overclaim=p, r_underclaim=0.05, q_probe=0.85)
             learner = SimulatedLearner.sample(u, float(rng.choice(args.masteries)), noise, rng)
             budget = float(rng.integers(int(args.budget_range[0]), int(args.budget_range[1]) + 1))
+            drop, add = float(rng.uniform(*args.edge_drop_range)), float(rng.uniform(*args.edge_add_range))
+            u = corrupt_universe(u, drop, add, rng) if (drop or add) else u
             policy = RLPolicy(net=net, noise=noise, rng=np.random.default_rng(rng.integers(1 << 31)),
                               n_particles=args.n_particles, use_belief=not args.no_belief, deterministic=False)
             env = BoundaryEnv(u, learner, budget=budget)
-            trans, final, cost = collect_episode(policy, env, learner, args.lam)
+            trans, final, cost = collect_episode(policy, env, learner, args.lam, args.random_termination, rng)
             batch.append(trans)
             finals.append(final)
             costs.append(cost)

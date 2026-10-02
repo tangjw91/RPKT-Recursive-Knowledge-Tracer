@@ -110,9 +110,29 @@ better than the matched one (it verifies slightly more). This removes a reviewer
 * The particle posterior's initial estimate starts at ~0.72 balanced accuracy before any probe
   (prior knowledge of the DAG) whereas rule-based policies start at 0.5; curves show this.
 
-## Next
+## Learned policy, first attempt (GNN + PPO, 120 updates x 24 episodes, ~10 min CPU)
 
-1. RL policy (GNN + PPO, `experiments/train_rl.py`): compare with eig at fixed budgets on
-   held-out Metacademy targets (`models/metacademy_holdout_targets.txt`), with and without
-   belief features.
-2. Decide on better policies (see discussion with the authors).
+Trained on synthetic graphs + 70 % of Metacademy targets, overclaim rate drawn from [0, 0.4],
+budget from [10, 35]; evaluated on the 30 % held-out Metacademy targets (180 episodes per
+cell, budget 40). Full tables: `results/rl_holdout_ci.md`, `results/rl_synth_ci.md`.
+
+| p | policy | final | @10 | @15 | @20 | cost |
+|---|---|---|---|---|---|---|
+| 0.0 | eig | 0.976 | 0.896 | 0.947 | 0.966 | 20.0 |
+| 0.0 | rl (belief feats) | 0.976 | 0.820 | 0.893 | 0.938 | 30.7 |
+| 0.0 | rl (no belief) | 0.981 | 0.820 | 0.903 | 0.954 | 36.6 |
+| 0.0 | rpkt_v1 | 0.973 | 0.746 | 0.833 | 0.897 | 22.9 |
+| 0.2 | eig | 0.929 | 0.842 | 0.893 | 0.911 | 29.6 |
+| 0.2 | rl (belief feats) | 0.917 | 0.816 | 0.868 | 0.899 | 31.1 |
+| 0.2 | rl (no belief) | 0.931 | 0.781 | 0.857 | 0.899 | 36.3 |
+| 0.2 | rpkt_v1 | 0.790 | 0.698 | 0.753 | 0.775 | 16.1 |
+| 0.4 | eig | 0.920 | 0.819 | 0.873 | 0.897 | 31.4 |
+| 0.4 | rl (belief feats) | 0.891 | 0.802 | 0.840 | 0.863 | 32.1 |
+| 0.4 | rl (no belief) | 0.896 | 0.764 | 0.804 | 0.839 | 36.4 |
+| 0.4 | rpkt_v1 | 0.686 | 0.655 | 0.670 | 0.685 | 10.3 |
+
+Reading: the learned policy transfers to unseen targets and beats v1 everywhere, matches the
+EIG heuristic at full budget, but is 3-8 points behind at fixed budgets and spends more
+probes (it almost never stops early). The variant without belief features reaches the same
+final accuracy but verifies far more (it cannot see uncertainty). See
+`docs/POLICY_DISCUSSION.md` for why and what to do about it.

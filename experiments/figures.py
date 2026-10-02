@@ -23,7 +23,7 @@ COLORS = {"eig": "#2a78d6", "eig_noverify": "#eb6834", "rpkt_v1": "#1baf7a", "ra
 LABELS = {"eig": "Boundary search (EIG + verify)", "eig_noverify": "Boundary search (EIG, ask only)",
           "rpkt_v1": "RPKT v1 (recursive expansion)", "random": "Random", "enumerate": "Enumerate",
           "rl": "Learned policy (GNN+PPO)", "rl_nobelief": "Learned policy (no belief features)",
-          "rl_robust": "Learned policy (warm start, corrupted-graph training)", "bc": "Imitation of EIG"}
+          "rl_robust": "Learned policy (warm start + robust training)", "bc": "Imitation of EIG"}
 ORDER = ["rpkt_v1", "random", "enumerate", "eig_noverify", "eig", "rl", "rl_nobelief", "bc", "rl_robust"]
 INK, MUTED, GRID = "#0b0b0b", "#898781", "#e1e0d9"
 
@@ -95,7 +95,7 @@ def fig_overclaim(df: pd.DataFrame, out: Path) -> None:
 def fig_corruption(df: pd.DataFrame, out: Path) -> None:
     """Accuracy at 20 probes and probes spent vs. share of missing prerequisite edges (no spurious edges)."""
     d0 = df[df.edge_add.round(2) == 0.0]
-    fig, axes = plt.subplots(1, 2, figsize=(5.2, 2.4))
+    fig, axes = plt.subplots(1, 2, figsize=(5.6, 2.6))
     for ax, metric, ylabel in zip(axes, ["balacc_at_20", "cost"], ["balanced accuracy at 20 probes", "probes spent (budget 40)"]):
         for pol in ORDER:
             d = d0[d0.policy == pol]
@@ -109,10 +109,11 @@ def fig_corruption(df: pd.DataFrame, out: Path) -> None:
         ax.set_ylabel(ylabel)
         ax.grid(axis="y", color=GRID, lw=0.5)
     axes[0].set_ylim(0.55, 1.0)
-    axes[0].legend(frameon=False, fontsize=6, loc="lower left")
-    fig.tight_layout()
-    fig.savefig(out / "fig_corruption.pdf")
-    fig.savefig(out / "fig_corruption.png", dpi=200)
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, frameon=False, fontsize=6.5, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.02))
+    fig.tight_layout(rect=(0, 0.14, 1, 1))
+    fig.savefig(out / "fig_corruption.pdf", bbox_inches="tight")
+    fig.savefig(out / "fig_corruption.png", dpi=200, bbox_inches="tight")
 
 
 def main() -> None:

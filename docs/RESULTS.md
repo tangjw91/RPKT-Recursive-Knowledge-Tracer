@@ -1,4 +1,4 @@
-# Week 1 results: boundary search vs RPKT v1 on gold prerequisite graphs
+# Results log: boundary search vs RPKT v1 on gold prerequisite graphs
 
 Date: 2026-10-02. Code: `rpkt2/`, `experiments/run_baselines.py`. Raw tables: `results/*.md`.
 No LLM calls were used; everything below runs on a laptop in about two minutes.
@@ -59,16 +59,60 @@ Metacademy, overclaim 0.2: eig 0.93, eig_noverify 0.67, rpkt_v1 0.01, enumerate 
 4. **AL-CPL is too small** to separate policies (universe ~11, v1 == enumeration); it stays in
    the paper as the realism check, Metacademy and synthetic graphs carry the scaling story.
 
-## Caveats to fix before the paper
+## Sweeps (Metacademy, 3 seeds x 20 learners x 3 masteries = 180 episodes per cell, 95 % CI)
 
-* The eig policy is given the true noise parameters (p, r, q). Add a misspecified-noise run.
-* Only p in {0, 0.2}; sweep p in {0, 0.1, 0.2, 0.3, 0.4} for the robustness figure.
-* Single seed per configuration; add 3 seeds and confidence intervals.
+Scripts: `experiments/sweeps.sh`, tables `results/sweep_*_ci.md`, figures `figures/`.
+
+### Overclaim rate p (budget 40, probe accuracy 0.85, verify cost 1)
+
+| p | rpkt_v1 | random | eig ask-only | eig + verify | overclaims caught (ask-only / verify) |
+|---|---|---|---|---|---|
+| 0.0 | 0.981 ± .005 | 0.979 ± .006 | 0.985 ± .005 | 0.985 ± .005 | – |
+| 0.1 | 0.909 ± .015 | 0.939 ± .008 | 0.959 ± .009 | 0.967 ± .007 | 0.65 / 0.81 |
+| 0.2 | 0.836 ± .018 | 0.894 ± .010 | 0.930 ± .012 | 0.935 ± .010 | 0.62 / 0.91 |
+| 0.3 | 0.758 ± .020 | 0.845 ± .012 | 0.910 ± .011 | 0.921 ± .012 | 0.74 / 0.93 |
+| 0.4 | 0.703 ± .019 | 0.802 ± .012 | 0.866 ± .013 | 0.927 ± .011 | 0.75 / 0.91 |
+
+v1 loses 0.07 balanced accuracy per 0.1 of overclaim rate; boundary search with verification
+loses 0.015. Below p = 0.3 structural inference alone matches verification; at p = 0.4
+verification is worth 6 points. See `figures/fig_overclaim.pdf` and `fig_curves.pdf`
+(with calibrated learners, boundary search reaches 0.9 at ~9 probes, v1 at ~17).
+
+### Probe reliability q x verification cost (p = 0.2)
+
+| q | verify cost | eig ask-only | eig + verify | verifications used | overclaims caught |
+|---|---|---|---|---|---|
+| 0.70 | 1 | 0.939 ± .011 | 0.932 ± .010 | 8.8 | 0.76 |
+| 0.85 | 1 | 0.930 ± .012 | 0.935 ± .010 | 11.6 | 0.91 |
+| 0.95 | 1 | 0.936 ± .011 | **0.971 ± .007** | 15.7 | 0.97 |
+| 0.95 | 2 | 0.933 ± .012 | 0.967 ± .007 | 8.7 | 0.96 |
+
+Verification pays only when the micro-probe is reliable (q >= 0.9); with q = 0.7 the policy
+correctly stops using it. Doubling its cost halves its use without losing final accuracy.
+This sets the bar for Paper B's probe generator: items must discriminate at >= 0.9.
+
+### Misspecified belief (policy assumes p = 0.1 regardless of the truth)
+
+| true p | matched belief | belief fixed at 0.1 |
+|---|---|---|
+| 0.0 | 0.985 ± .005 | 0.970 ± .007 |
+| 0.2 | 0.935 ± .010 | 0.953 ± .009 |
+| 0.3 | 0.921 ± .012 | 0.937 ± .010 |
+| 0.4 | 0.927 ± .011 | 0.927 ± .011 |
+
+The policy does not need the learner's overclaim rate: a fixed mild prior is as good as or
+better than the matched one (it verifies slightly more). This removes a reviewer objection.
+
+## Caveats
+
 * `rpkt_v1_k4` equals `rpkt_v1` on synthetic graphs because every node has <= 4 prerequisites.
+* AL-CPL universes (~11 nodes) cannot separate policies; keep as realism check only.
+* The particle posterior's initial estimate starts at ~0.72 balanced accuracy before any probe
+  (prior knowledge of the DAG) whereas rule-based policies start at 0.5; curves show this.
 
 ## Next
 
-1. Noise and cost sweeps (p, q, verify cost) and misspecified-noise robustness.
-2. RL policy (GNN + PPO) in the same environment; compare with eig at fixed budgets;
-   leave-one-graph-family-out transfer.
-3. Figures: balanced accuracy vs probes, probes-to-0.9 vs overclaim rate.
+1. RL policy (GNN + PPO, `experiments/train_rl.py`): compare with eig at fixed budgets on
+   held-out Metacademy targets (`models/metacademy_holdout_targets.txt`), with and without
+   belief features.
+2. Decide on better policies (see discussion with the authors).

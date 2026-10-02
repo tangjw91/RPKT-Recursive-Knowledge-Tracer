@@ -9,7 +9,10 @@ ranks the options.
 1. **Objective mismatch.** Reward = sum of balanced-accuracy gains minus 0.004 per probe,
    discount 0.99. That maximises accuracy *at the sampled budget*, with almost no pressure to
    gain early, so the agent is not optimising the accuracy-vs-probes curve we report. The
-   retrain now running uses discount 0.9 and penalty 0.01 to test this.
+   retrain with discount 0.9 and penalty 0.01 **collapsed to stopping immediately** within
+   20 updates (cost 0, accuracy 0.78 = the prior's estimate): the stop action became dominant
+   before the policy learned which probes pay. The objective needs random early termination
+   (so every budget matters) rather than a larger per-probe penalty, plus a warm start (option 2).
 2. **Data.** 2,880 episodes of on-policy data versus a heuristic that uses an explicit
    Bayesian model and needs no training. PPO is sample-hungry; the policy is still improving.
 3. **Stopping.** With a 0.004 penalty any expected gain above 0.4 points justifies a probe,
@@ -25,14 +28,14 @@ ranks the options.
 |---|---|---|---|---|
 | 1 | **Train and test on corrupted graphs** (missing / spurious prerequisite edges, as LLM extraction produces; Paper B measures the real rates) | RL learns when to distrust structure; EIG trusts the DAG and degrades. Ties Paper A to Paper B. | 1-2 days (edge-noise option in env + retrain) | High: this is where the Bayesian model is misspecified |
 | 2 | **Imitation then RL** (DAgger from EIG, then PPO fine-tune) | Amortised Bayesian experimental design: same decisions as EIG at a fraction of the compute, then improvements on top | 1 day | High for "matches", medium for "beats" |
-| 3 | **Fix the objective** (discount 0.9, cost 0.01, random early termination so every budget matters) | Fair fixed-budget comparison | running now | Medium |
+| 3 | **Fix the objective** (random early termination so every budget matters; keep a small penalty; warm start) | Fair fixed-budget comparison | tried penalty 0.01 / discount 0.9: collapsed to immediate stop | Medium |
 | 4 | **Non-myopic planning**: 2-step lookahead or MCTS over the particle belief | Improves stop / verify timing; no training | 1-2 days, slow inference | Low-medium; gains on long chains only |
 | 5 | **Algorithm swap** (DQN with action masking, or REINFORCE with the EIG score as baseline) | Sample efficiency | 1 day | Low: objective and data matter more than the algorithm |
 | 6 | **More training** (5-10x episodes, GPU) | Closes the fixed-budget gap | hours | Medium, but only matches |
 
 ## Recommendation
 
-Do 3 (already running) as the sanity check, then 1 as the main RL experiment of Paper A:
+Do 2 first (warm start from EIG prevents the stop collapse), then 1 as the main RL experiment of Paper A:
 *"a learned probe policy is robust to prerequisite-graph errors that break a model-based
 heuristic"*. Use 2 as the initialisation so the learned policy starts at EIG quality.
 This keeps the honest fallback (EIG is near-optimal on correct graphs) and gives RL a claim

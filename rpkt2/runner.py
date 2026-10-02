@@ -1,6 +1,7 @@
 """Run one policy on one (target, learner) episode and record the metric trajectory."""
 from __future__ import annotations
 
+import json
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -53,6 +54,7 @@ def run_episode(policy: Policy, env: BoundaryEnv, learner: SimulatedLearner, f1_
         "overclaims_caught": int((over & est).sum()),
         "universe_size": env.u.n,
         **{f"balacc_at_{b}": score_at_budget(traj, b, initial) for b in BUDGET_CHECKPOINTS},
+        "traj": json.dumps([(round(c, 2), round(s, 4)) for c, s in [(0.0, initial)] + traj]),
         "true_unknown_size": int(true_unknown.sum()),
     })
     return out

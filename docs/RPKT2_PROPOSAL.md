@@ -1,8 +1,22 @@
-# RPKT‑2: two‑paper plan
+# RPKT‑2: final plan (two papers, parallel tracks)
 
-Follow‑up to RPKT (FMLDS 2025, arXiv:2508.11892). Decisions so far:
-no human study is possible; add an RL component; split into two papers.
-Date of plan: 2026‑10‑02.
+Follow‑up to RPKT (FMLDS 2025, arXiv:2508.11892). Final decisions
+(2026‑10‑02): no human study; add an RL probe policy; split into two
+papers; run the two tracks in parallel after a shared first week; develop
+Paper B with a local open‑weight model and spend API budget only on final
+runs.
+
+## Decision summary
+
+| Item | Decision |
+|---|---|
+| Papers | A: boundary‑search formulation + simulator + learned policy (ICLR 2027 workshop, 4 pp, non‑archival). B: on‑demand LLM graphs + verified self‑assessment + end‑to‑end system (IEEE / EDM, 6 pp, archival). |
+| Order | A first (earliest deadline, zero cost, builds B's environment). |
+| Evaluation | Machine‑only: gold‑graph simulation, extraction vs gold, LLM‑simulated learners, optional MOOCCube log‑derived learners, cost/latency. |
+| Parallelism | Week 1 shared simulator; then Track A (env, baselines, RL) and Track B (graph builder, probes, simulated learners) in parallel; B feeds A an "LLM‑built graph" robustness condition, A feeds B the policy. |
+| Models | Dev with Qwen3 14B (Q4, ~10 GB VRAM) via Ollama; final B runs with GPT‑4o (v1 parity), one GPT‑5‑class/frontier model, and the local model as the open‑weight row. Simulated learner = a different, strong model from the system model. |
+| Budget | Paper A: laptop / free Colab. Paper B: ~$200 total, $300–500 with a flagship row and margin; Batch API halves it. |
+| ICLR timeline | Accepted workshops announced 2026‑11‑29; paper deadlines typically early Feb 2027; author notification by 2027‑02‑26; workshops 2027‑04‑29/30, San Francisco. The Oct 9 deadline is for *organising* workshops and does not apply. Verify on iclr.cc. Fallbacks: EDM 2027, AIED 2027, BEA@ACL 2027. |
 
 ---
 
@@ -155,6 +169,21 @@ noise model without being told it". Decide the framing in week 4.
 6. **Writing (week 13–14).** 6 pages IEEE two‑column.
 
 ---
+
+## Code layout (one package serves both papers)
+
+```
+rpkt2/
+  graph.py       gold DAG loading (AL‑CPL), ancestors, topological order, order‑ideal sampling
+  learner.py     simulated learner: mastery m, overclaim p, underclaim r, probe noise q
+  env.py         boundary‑search environment: actions ask / verify / stop, budget, evidence
+  belief.py      particle posterior over order ideals with monotone constraint
+  metrics.py     unknown‑set P/R/F1, boundary error, probes‑to‑F1, overclaims caught
+  policies/      rpkt_v1 (exact re‑implementation), enumerate, random, bfs, eig, (rl)
+  llm/           Paper B: graph builder (agentic), canonicaliser, probe generator, judge
+experiments/     one script per table or figure; CSV + markdown output
+data/alcpl/      AL‑CPL .preqs files (CC BY‑NC‑SA 4.0) + fetch script
+```
 
 ## Shared timeline (from 2026‑10‑02)
 

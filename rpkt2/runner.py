@@ -11,12 +11,26 @@ from .metrics import cost_to_reach, unknown_set_scores
 from .policies.base import Policy
 
 
+BUDGET_CHECKPOINTS = (5, 10, 15, 20, 30)
+
+
+def score_at_budget(trajectory: List[Tuple[float, float]], budget: float, initial: float) -> float:
+    """Score of the estimate the policy held when its spend last fitted inside `budget`."""
+    score = initial
+    for cost, s in trajectory:
+        if cost > budget:
+            break
+        score = s
+    return score
+
+
 def run_episode(policy: Policy, env: BoundaryEnv, learner: SimulatedLearner, f1_target: float = 0.9) -> Dict:
     """f1_target is the balanced-accuracy threshold used for cost_to_target."""
     obs = env.reset()
     policy.reset(env.u)
     traj: List[Tuple[float, float]] = []
     true_unknown = learner.true_unknown
+    initial = unknown_set_scores(policy.estimate(obs), true_unknown)["bal_acc"]
     done = False
     n_ask = n_verify = 0
     while not done:
@@ -38,6 +52,7 @@ def run_episode(policy: Policy, env: BoundaryEnv, learner: SimulatedLearner, f1_
         "overclaims_total": int(over.sum()),
         "overclaims_caught": int((over & est).sum()),
         "universe_size": env.u.n,
+        **{f"balacc_at_{b}": score_at_budget(traj, b, initial) for b in BUDGET_CHECKPOINTS},
         "true_unknown_size": int(true_unknown.sum()),
     })
     return out

@@ -74,6 +74,7 @@ def main() -> None:
             "recall": d["recall"].mean(), "cost": d["cost"].mean(), "verify": d["n_verify"].mean(),
             "cost_to_balacc>=0.9": d.loc[reached, "cost_to_target"].median() if reached.any() else np.nan,
             "reached_0.9": reached.mean(), "universe": d["universe_size"].mean(),
+            **{f"ba@{b}": d[f"balacc_at_{b}"].mean() for b in (5, 10, 15, 20, 30)},
             "overclaims_caught": d["overclaims_caught"].sum() / max(d["overclaims_total"].sum(), 1),
             "n": len(d),
         })

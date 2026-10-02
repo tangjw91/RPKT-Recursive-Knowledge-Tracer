@@ -28,7 +28,8 @@ Thumbs.db
 .streamlit/secrets.toml
 
 # Logs
-*.logresults_*.log
+*.log
+results_*.log
 results/*.csv
 __pycache__/
 .pytest_cache/

@@ -42,7 +42,7 @@ def collect_episode(policy: RLPolicy, env: BoundaryEnv, learner: SimulatedLearne
     return trans, prev, env.cost_used
 
 
-def ppo_update(net, opt, batch, gamma=0.99, lam_gae=0.95, clip=0.2, epochs=4, ent_coef=0.01, vf_coef=0.5):
+def ppo_update(net, opt, batch, gamma=0.9, lam_gae=0.95, clip=0.2, epochs=4, ent_coef=0.01, vf_coef=0.5):
     # GAE per episode (batch is a list of episodes, each a list of Transition)
     xs, advs, rets, acts, old_logps = [], [], [], [], []
     for ep in batch:

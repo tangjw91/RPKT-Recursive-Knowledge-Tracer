@@ -47,3 +47,14 @@ Graph corruption to simulate, matched later to Paper B's measured extraction err
 * add a spurious edge from a random non-ancestor with probability a (hallucinated
   prerequisite), keeping the graph acyclic;
 * the learner's true state lives on the gold graph; the policy only sees the corrupted one.
+
+## Outcome (2026-10-02, later the same day)
+
+Option 2 + 1 were run (`experiments/train_robust.sh`). Result in `docs/RESULTS.md`: the
+warm-started policy matches or beats the heuristic in every corruption cell
+(+0.010 ± 0.006 balanced accuracy pooled, paired), with 30 % fewer probes and 70 % fewer
+verifications. The heuristic turned out to be robust to missing edges, so the RL claim for
+Paper A is "amortised, cheaper, and at least as accurate under extraction errors", not
+"robust where the heuristic breaks". Next candidates if a larger margin is wanted: longer
+PPO fine-tuning (GPU), a budget-conditioned value head, and training on the LLM-built graphs
+from Paper B instead of synthetic corruption.

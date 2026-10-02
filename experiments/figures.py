@@ -92,17 +92,44 @@ def fig_overclaim(df: pd.DataFrame, out: Path) -> None:
     fig.savefig(out / "fig_overclaim.png", dpi=200)
 
 
+def fig_corruption(df: pd.DataFrame, out: Path) -> None:
+    """Accuracy at 20 probes and probes spent vs. share of missing prerequisite edges (no spurious edges)."""
+    d0 = df[df.edge_add.round(2) == 0.0]
+    fig, axes = plt.subplots(1, 2, figsize=(5.2, 2.4))
+    for ax, metric, ylabel in zip(axes, ["balacc_at_20", "cost"], ["balanced accuracy at 20 probes", "probes spent (budget 40)"]):
+        for pol in ORDER:
+            d = d0[d0.policy == pol]
+            if d.empty:
+                continue
+            g = d.groupby("edge_drop")[metric]
+            m, se = g.mean(), g.std(ddof=1) / np.sqrt(g.size())
+            ax.plot(m.index, m.values, color=COLORS[pol], lw=1.6, marker="o", ms=3.5, label=LABELS[pol])
+            ax.fill_between(m.index, m - 1.96 * se, m + 1.96 * se, color=COLORS[pol], alpha=0.15, lw=0)
+        ax.set_xlabel("share of prerequisite edges missing")
+        ax.set_ylabel(ylabel)
+        ax.grid(axis="y", color=GRID, lw=0.5)
+    axes[0].set_ylim(0.55, 1.0)
+    axes[0].legend(frameon=False, fontsize=6, loc="lower left")
+    fig.tight_layout()
+    fig.savefig(out / "fig_corruption.pdf")
+    fig.savefig(out / "fig_corruption.png", dpi=200)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("csvs", nargs="+")
     ap.add_argument("--out", default="figures")
     ap.add_argument("--max-cost", type=int, default=30)
+    ap.add_argument("--corruption", action="store_true", help="inputs are corrupted-graph cells; draw fig_corruption only")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(exist_ok=True)
     df = pd.concat([pd.read_csv(c) for c in args.csvs], ignore_index=True)
-    fig_curves(df, out, args.max_cost)
-    fig_overclaim(df, out)
+    if args.corruption:
+        fig_corruption(df, out)
+    else:
+        fig_curves(df, out, args.max_cost)
+        fig_overclaim(df, out)
     print("wrote", sorted(p.name for p in out.iterdir()))
 
 

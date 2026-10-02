@@ -136,3 +136,40 @@ EIG heuristic at full budget, but is 3-8 points behind at fixed budgets and spen
 probes (it almost never stops early). The variant without belief features reaches the same
 final accuracy but verifies far more (it cannot see uncertainty). See
 `docs/POLICY_DISCUSSION.md` for why and what to do about it.
+
+## Learned policy, second attempt: warm start + corrupted-graph training (`rl_robust`)
+
+Recipe (`experiments/train_robust.sh`): DAgger from the EIG heuristic for 3 iterations
+(3.6k labelled states, 49 % exact agreement, many actions being near-ties), then 120 PPO
+updates with random early termination (so accuracy at every budget matters), on clean and
+corrupted graphs (edge drop 0-0.4, spurious edges 0-0.3). Evaluated on held-out Metacademy
+targets, overclaim 0.2, 180 episodes per cell; tables `results/corrupt_ci.md`,
+`results/corrupt_paired.md`, figure `figures/fig_corruption.pdf`.
+
+| drop | add | rpkt_v1 | eig + verify | eig ask-only | rl (first attempt) | **rl_robust** | cost: eig / rl_robust |
+|---|---|---|---|---|---|---|---|
+| 0.0 | 0.0 | 0.785 | 0.925 | 0.930 | 0.918 | **0.934** | 29.4 / 20.8 |
+| 0.0 | 0.2 | 0.814 | 0.893 | 0.891 | 0.888 | **0.904** | 28.1 / 20.7 |
+| 0.2 | 0.0 | 0.702 | 0.926 | 0.932 | 0.919 | 0.928 | 31.1 / 21.6 |
+| 0.2 | 0.2 | 0.736 | 0.886 | 0.890 | 0.890 | **0.905** | 29.4 / 21.0 |
+| 0.4 | 0.0 | 0.612 | 0.913 | 0.916 | 0.914 | **0.921** | 33.2 / 22.7 |
+| 0.4 | 0.2 | 0.643 | 0.889 | 0.887 | 0.886 | **0.900** | 31.6 / 22.1 |
+
+Paired on identical episodes (rl_robust minus eig, 95 % CI, n = 1080 pooled):
+final balanced accuracy +0.010 ± 0.006, at 15 probes +0.011 ± 0.006, probes spent
+-9.0 ± 0.3 (-30 %), verification items 4 vs 12 (-70 %).
+
+Reading:
+1. **The learned policy now matches or beats the Bayesian heuristic in every cell**, with a
+   small but significant accuracy edge pooled over cells, while spending 30 % fewer learner
+   interactions and 70 % fewer verification items. It learned *when* verification pays.
+2. **Missing prerequisite edges do not break the heuristic** (0.925 -> 0.913 at 40 % missing):
+   the particle posterior still gets most inference from the edges that remain. Spurious edges
+   cost every policy 3-4 points. So the "RL is robust where the model is misspecified" story is
+   only mildly supported; the defensible claim is parity-or-better at lower cost under all
+   extraction-error levels.
+3. **RPKT v1 collapses under extraction errors** (0.785 -> 0.612 at 40 % missing edges): a
+   missing edge hides a whole subtree from blind recursion. This is a direct statement about
+   the published system under realistic LLM extraction quality.
+4. The warm start and random termination are what fixed the first attempt (it over-spent
+   and never stopped); the high-penalty retrain without warm start collapsed to stopping.

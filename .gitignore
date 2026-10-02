@@ -33,3 +33,4 @@ results_*.log
 results/*.csv
 __pycache__/
 .pytest_cache/
+models/*.pt

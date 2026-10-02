@@ -86,7 +86,7 @@ def ppo_update(net, opt, batch, gamma=0.99, lam_gae=0.95, clip=0.2, epochs=4, en
             loss.backward()
             torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
             opt.step()
-            stats = {"loss_pi": float(loss_pi) / len(idx), "loss_v": float(loss_v) / len(idx)}
+            stats = {"loss_pi": float(loss_pi.detach()) / len(idx), "loss_v": float(loss_v.detach()) / len(idx)}
     return stats
 
 

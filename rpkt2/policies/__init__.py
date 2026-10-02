@@ -24,6 +24,8 @@ REGISTRY = {
     "eig_noverify": lambda **kw: EIGPolicy(allow_verify=False, **kw),
     "rl": _rl,
     "rl_nobelief": lambda **kw: _rl(model_path="models/rl_policy_nobelief.pt", **kw),
+    "rl_robust": lambda **kw: _rl(model_path="models/rl_robust.pt", **kw),
+    "bc": lambda **kw: _rl(model_path="models/bc_policy.pt", **kw),
 }
 
 __all__ = ["Policy", "RPKTv1Policy", "EnumeratePolicy", "RandomPolicy", "EIGPolicy", "REGISTRY"]

@@ -19,11 +19,12 @@ matplotlib.use("Agg")
 
 # Fixed categorical order (validated palette, light surface); never cycled.
 COLORS = {"eig": "#2a78d6", "eig_noverify": "#eb6834", "rpkt_v1": "#1baf7a", "random": "#eda100",
-          "enumerate": "#e87ba4", "rl": "#4a3aa7", "rl_nobelief": "#e34948"}
+          "enumerate": "#e87ba4", "rl": "#4a3aa7", "rl_nobelief": "#e34948", "rl_robust": "#008300", "bc": "#898781"}
 LABELS = {"eig": "Boundary search (EIG + verify)", "eig_noverify": "Boundary search (EIG, ask only)",
           "rpkt_v1": "RPKT v1 (recursive expansion)", "random": "Random", "enumerate": "Enumerate",
-          "rl": "Learned policy (GNN+PPO)", "rl_nobelief": "Learned policy (no belief features)"}
-ORDER = ["rpkt_v1", "random", "enumerate", "eig_noverify", "eig", "rl", "rl_nobelief"]
+          "rl": "Learned policy (GNN+PPO)", "rl_nobelief": "Learned policy (no belief features)",
+          "rl_robust": "Learned policy (warm start, corrupted-graph training)", "bc": "Imitation of EIG"}
+ORDER = ["rpkt_v1", "random", "enumerate", "eig_noverify", "eig", "rl", "rl_nobelief", "bc", "rl_robust"]
 INK, MUTED, GRID = "#0b0b0b", "#898781", "#e1e0d9"
 
 plt.rcParams.update({"font.size": 8, "axes.edgecolor": "#c3c2b7", "axes.labelcolor": INK,
